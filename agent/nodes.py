@@ -524,8 +524,8 @@ def synthesize_insights_node(state: dict) -> dict:
     # Try to initialize LLM for goal-specific answers
     try:
         from config.llm_config import get_llm
-        llm = get_llm(model="tinyllama", temperature=0.5)
-        if llm.is_available():
+        llm = get_llm(temperature=0.5)  # Auto-selects Groq or Ollama
+        if llm and llm.is_available():
             llm_available = True
     except Exception:
         pass
@@ -991,13 +991,13 @@ def synthesize_standard_insights_node(state: dict) -> dict:
     _emit_progress(state, node_name, 0.70, "Initializing AI assistant...")
     try:
         from config.llm_config import get_llm, OllamaConnectionError
-        llm = get_llm(model="tinyllama", temperature=0.6)
+        llm = get_llm(temperature=0.6)  # Auto-selects Groq or Ollama
         
         # Quick availability check
-        if llm.is_available():
+        if llm and llm.is_available():
             llm_available = True
         else:
-            warnings.append("Local LLM unavailable - using template-based insights")
+            warnings.append("LLM unavailable - using template-based insights")
     except Exception as e:
         warnings.append(f"LLM initialization skipped: {str(e)}")
     
