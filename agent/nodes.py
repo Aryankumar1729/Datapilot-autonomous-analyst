@@ -548,7 +548,7 @@ def synthesize_insights_node(state: dict) -> dict:
     # Generate insights from KPIs
     _emit_progress(state, node_name, 0.75, "Analyzing key metrics...")
     for kpi in kpis[:5]:  # Top 5 KPIs
-        insight = _generate_kpi_insight(kpi)
+        insight = _generate_kpi_insight(kpi, llm=llm if llm_available else None, warnings=warnings)
         if insight:
             insights.append(insight)
     
@@ -593,14 +593,35 @@ def synthesize_insights_node(state: dict) -> dict:
     }
 
 
-def _generate_kpi_insight(kpi: dict) -> dict | None:
-    """Generate insight from a KPI."""
+def _generate_kpi_insight(kpi: dict, llm=None, warnings: list = None) -> dict | None:
+    """Generate insight from a KPI, optionally using LLM for richer text."""
     name = kpi.get("name", "")
     value = kpi.get("formatted_value", "")
     
     if not name or not value:
         return None
     
+    # Try LLM-enhanced insight if available
+    if llm:
+        try:
+            body = llm.generate_insight(
+                statistical_finding=f"{name}: {value}",
+                context="This is a key business metric from the dataset."
+            )
+            if body and len(body) > 10:
+                return {
+                    "title": name,
+                    "body": body,
+                    "severity": "info",
+                    "category": "kpi",
+                    "supporting_data": kpi,
+                    "llm_enhanced": True,
+                }
+        except Exception as e:
+            if warnings is not None:
+                warnings.append(f"LLM insight generation failed: {str(e)[:100]}")
+    
+    # Template fallback
     return {
         "title": name,
         "body": f"**{value}** detected as a key metric in your data.",
@@ -1019,12 +1040,10 @@ def synthesize_standard_insights_node(state: dict) -> dict:
     # Generate insights from each analysis component
     _emit_progress(state, node_name, 0.73, "Analyzing key metrics...")
     
-    # 1. KPI insights
+    # 1. KPI insights (use LLM directly if available)
     for kpi in kpis[:5]:
-        insight = _generate_kpi_insight(kpi)
+        insight = _generate_kpi_insight(kpi, llm=llm if llm_available else None, warnings=warnings)
         if insight:
-            if llm_available:
-                insight = _enhance_insight_with_llm(llm, insight, goal)
             insights.append(insight)
     
     # 2. Distribution insights (Standard mode specific)
@@ -1483,7 +1502,7 @@ def _build_data_context_for_question(
 # LLM ENHANCEMENT HELPERS
 # =============================================================================
 
-def _enhance_insight_with_llm(llm, insight: dict, goal: str) -> dict:
+def _enhance_insight_with_llm(llm, insight: dict, goal: str, warnings: list = None) -> dict:
     """
     Enhance an insight with LLM-generated business interpretation.
     
@@ -1508,9 +1527,10 @@ def _enhance_insight_with_llm(llm, insight: dict, goal: str) -> dict:
             insight["body"] = enhanced_body
             insight["llm_enhanced"] = True
         
-    except Exception:
-        # Silently fall back to original insight
-        pass
+    except Exception as e:
+        # Log warning but fall back to original insight
+        if warnings is not None:
+            warnings.append(f"LLM enhancement failed: {str(e)[:100]}")
     
     return insight
 
