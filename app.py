@@ -342,6 +342,21 @@ def render_sidebar():
             </div>
             """, unsafe_allow_html=True)
         
+        # LLM Status indicator
+        st.markdown("---")
+        try:
+            from config.llm_config import get_llm_status
+            status = get_llm_status()
+            if status["groq_available"]:
+                llm_label = "🟢 Groq (Cloud)"
+            elif status["ollama_available"]:
+                llm_label = "🟡 Ollama (Local)"
+            else:
+                llm_label = "⚪ Stats Only"
+            st.markdown(f'<div style="color: #64748b; font-size: 0.75rem; text-align: center;">LLM: {llm_label}</div>', unsafe_allow_html=True)
+        except Exception:
+            pass
+        
         # Footer
         st.markdown("---")
         st.markdown("""
