@@ -1,17 +1,19 @@
-# llm_config.py — Hybrid LLM factory (Ollama / OpenAI)
+# llm_config.py — Hybrid LLM factory (Groq / Ollama)
 # Handles provider switching, fallback logic, and client instantiation
 """
 llm_config.py — LLM Configuration & Factory
 
-Local-only LLM implementation using Ollama.
-Provides a unified interface for text generation and summarization.
+Supports:
+1. Groq API (cloud, free tier) - used when GROQ_API_KEY is available
+2. Ollama (local) - fallback when no API key
 
-Default model: tinyllama (lightweight, fast, runs on CPU)
+Default model: llama-3.1-8b-instant (Groq) or tinyllama (Ollama)
 """
 
 from __future__ import annotations
 
 import json
+import os
 import urllib.request
 import urllib.error
 from dataclasses import dataclass
@@ -23,7 +25,9 @@ from typing import Any
 # =============================================================================
 
 DEFAULT_MODEL = "tinyllama"
+DEFAULT_GROQ_MODEL = "llama-3.1-8b-instant"
 DEFAULT_OLLAMA_BASE_URL = "http://localhost:11434"
+GROQ_API_BASE_URL = "https://api.groq.com/openai/v1"
 DEFAULT_TEMPERATURE = 0.7
 DEFAULT_MAX_TOKENS = 1024
 REQUEST_TIMEOUT = 60  # seconds
@@ -379,50 +383,265 @@ Business insight:"""
 
 
 # =============================================================================
+# GROQ CLIENT (Cloud LLM)
+# =============================================================================
+
+@dataclass
+class GroqConfig:
+    """Configuration for Groq LLM."""
+    model: str = DEFAULT_GROQ_MODEL
+    api_key: str = ""
+    temperature: float = DEFAULT_TEMPERATURE
+    max_tokens: int = DEFAULT_MAX_TOKENS
+    timeout: int = REQUEST_TIMEOUT
+
+
+class GroqLLM:
+    """
+    Groq API client for text generation.
+    
+    Uses OpenAI-compatible API format.
+    """
+    
+    def __init__(self, config: GroqConfig | None = None):
+        """Initialize Groq client."""
+        self.config = config or GroqConfig()
+        if not self.config.api_key:
+            self.config.api_key = self._get_api_key()
+    
+    @staticmethod
+    def _get_api_key() -> str:
+        """Get API key from environment or Streamlit secrets."""
+        # Try Streamlit secrets first
+        try:
+            import streamlit as st
+            if hasattr(st, 'secrets') and 'GROQ_API_KEY' in st.secrets:
+                return st.secrets['GROQ_API_KEY']
+        except Exception:
+            pass
+        
+        # Fall back to environment variable
+        return os.environ.get('GROQ_API_KEY', '')
+    
+    @property
+    def model(self) -> str:
+        return self.config.model
+    
+    def is_available(self) -> bool:
+        """Check if Groq API is available (has API key)."""
+        return bool(self.config.api_key)
+    
+    def generate(
+        self,
+        prompt: str,
+        system_prompt: str | None = None,
+        temperature: float | None = None,
+        max_tokens: int | None = None,
+    ) -> str:
+        """
+        Generate text completion using Groq API.
+        
+        Returns:
+            Generated text response
+        """
+        if not self.config.api_key:
+            raise LLMError("Groq API key not configured")
+        
+        messages = []
+        if system_prompt:
+            messages.append({"role": "system", "content": system_prompt})
+        messages.append({"role": "user", "content": prompt})
+        
+        payload = {
+            "model": self.config.model,
+            "messages": messages,
+            "temperature": temperature or self.config.temperature,
+            "max_tokens": max_tokens or self.config.max_tokens,
+        }
+        
+        try:
+            data = json.dumps(payload).encode("utf-8")
+            request = urllib.request.Request(
+                f"{GROQ_API_BASE_URL}/chat/completions",
+                data=data,
+                headers={
+                    "Content-Type": "application/json",
+                    "Authorization": f"Bearer {self.config.api_key}",
+                },
+                method="POST",
+            )
+            
+            with urllib.request.urlopen(request, timeout=self.config.timeout) as response:
+                result = json.loads(response.read().decode("utf-8"))
+                return result["choices"][0]["message"]["content"].strip()
+                
+        except urllib.error.HTTPError as e:
+            error_body = e.read().decode("utf-8") if e.fp else str(e)
+            raise LLMError(f"Groq API error ({e.code}): {error_body}")
+        except Exception as e:
+            raise LLMError(f"Groq request failed: {str(e)}")
+    
+    def summarize(
+        self,
+        text: str,
+        max_length: int | None = None,
+        style: str = "concise",
+    ) -> str:
+        """Summarize input text."""
+        style_instructions = {
+            "concise": "Provide a brief, concise summary in 2-3 sentences.",
+            "detailed": "Provide a detailed summary covering all key points.",
+            "bullet": "Provide a summary as bullet points listing key insights.",
+        }
+        
+        instruction = style_instructions.get(style, style_instructions["concise"])
+        if max_length:
+            instruction += f" Keep it under {max_length} words."
+        
+        prompt = f"""Summarize the following text.
+
+{instruction}
+
+Text to summarize:
+{text}
+
+Summary:"""
+        
+        return self.generate(
+            prompt=prompt,
+            system_prompt="You are a helpful assistant that provides clear, accurate summaries.",
+            temperature=0.3,
+        )
+    
+    def analyze(self, data_description: str, question: str) -> str:
+        """Analyze data based on description and question."""
+        prompt = f"""Based on the following data analysis results, answer the question.
+
+Data Summary:
+{data_description}
+
+Question: {question}
+
+Provide a clear, data-driven answer:"""
+        
+        return self.generate(
+            prompt=prompt,
+            system_prompt=(
+                "You are a data analyst assistant. Provide clear, actionable insights "
+                "based on the data presented. Be specific and reference actual numbers."
+            ),
+            temperature=0.5,
+        )
+    
+    def generate_insight(self, statistical_finding: str, context: str | None = None) -> str:
+        """Transform a statistical finding into a business insight."""
+        context_str = f"\nBusiness context: {context}" if context else ""
+        
+        prompt = f"""Transform this statistical finding into a clear business insight.
+
+Statistical finding: {statistical_finding}{context_str}
+
+Write a 1-2 sentence business insight that:
+1. Explains what this means in plain English
+2. Suggests a potential action or implication
+
+Business insight:"""
+        
+        return self.generate(
+            prompt=prompt,
+            system_prompt=(
+                "You are a business analyst who translates statistics into actionable insights. "
+                "Be clear, specific, and business-focused."
+            ),
+            temperature=0.6,
+        )
+
+
+# =============================================================================
 # FACTORY FUNCTION
 # =============================================================================
 
 def get_llm(
-    model: str = DEFAULT_MODEL,
+    model: str | None = None,
     temperature: float = DEFAULT_TEMPERATURE,
     max_tokens: int = DEFAULT_MAX_TOKENS,
     base_url: str = DEFAULT_OLLAMA_BASE_URL,
     verify: bool = False,
-) -> OllamaLLM:
+    prefer_cloud: bool = True,
+) -> GroqLLM | OllamaLLM | None:
     """
     Factory function to create an LLM instance.
     
+    Priority order (when prefer_cloud=True):
+    1. Groq API (if GROQ_API_KEY is available)
+    2. Ollama (local, if running)
+    3. None (statistics-only mode)
+    
     Args:
-        model: Ollama model name (default: tinyllama)
+        model: Model name (auto-selected based on provider if None)
         temperature: Sampling temperature (0.0-1.0)
         max_tokens: Maximum tokens to generate
-        base_url: Ollama server URL
+        base_url: Ollama server URL (for local fallback)
         verify: If True, verify model availability on creation
+        prefer_cloud: If True, try Groq first; if False, try Ollama first
         
     Returns:
-        Configured OllamaLLM instance
-        
-    Raises:
-        OllamaConnectionError: If verify=True and server is not reachable
-        ModelNotFoundError: If verify=True and model is not available
+        Configured LLM instance (GroqLLM, OllamaLLM, or None)
         
     Example:
-        llm = get_llm(model="tinyllama", temperature=0.7)
-        response = llm.generate("Explain this data trend...")
+        llm = get_llm()  # Auto-selects best available provider
+        if llm:
+            response = llm.generate("Explain this data trend...")
     """
-    config = OllamaConfig(
-        model=model,
+    # Try Groq first (cloud)
+    if prefer_cloud:
+        groq_llm = GroqLLM(GroqConfig(
+            model=model or DEFAULT_GROQ_MODEL,
+            temperature=temperature,
+            max_tokens=max_tokens,
+        ))
+        if groq_llm.is_available():
+            return groq_llm
+    
+    # Fall back to Ollama (local)
+    ollama_config = OllamaConfig(
+        model=model or DEFAULT_MODEL,
         base_url=base_url,
         temperature=temperature,
         max_tokens=max_tokens,
     )
+    ollama_llm = OllamaLLM(ollama_config)
     
-    llm = OllamaLLM(config)
+    if ollama_llm.is_available():
+        if verify:
+            try:
+                ollama_llm.verify_model()
+            except (ModelNotFoundError, OllamaConnectionError):
+                return None
+        return ollama_llm
     
-    if verify:
-        llm.verify_model()
+    # No LLM available
+    return None
+
+
+def get_llm_status() -> dict:
+    """
+    Check LLM availability status.
     
-    return llm
+    Returns:
+        Dict with status information
+    """
+    groq_available = GroqLLM().is_available()
+    ollama_llm = OllamaLLM()
+    ollama_available = ollama_llm.is_available()
+    
+    return {
+        "groq_available": groq_available,
+        "ollama_available": ollama_available,
+        "active_provider": "groq" if groq_available else ("ollama" if ollama_available else None),
+        "groq_model": DEFAULT_GROQ_MODEL,
+        "ollama_model": DEFAULT_MODEL,
+    }
 
 
 def check_ollama_status() -> dict:
