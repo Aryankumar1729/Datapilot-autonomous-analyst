@@ -2,7 +2,7 @@
 
 **Agent-driven analytics from any CSV. Upload → Analyze → Insight.**
 
-[![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://your-app-url.streamlit.app)
+[![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://datapilot-autonomous-analyst.streamlit.app)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
@@ -70,8 +70,8 @@ No two datasets get the same cookie-cutter analysis.
 
 ```bash
 # Clone
-git clone https://github.com/yourusername/datapilot-autonomous-analyst.git
-cd datapilot-autonomous-analyst
+git clone https://github.com/Aryankumar1729/Datapilot-autonomous-analyst.git
+cd Datapilot-autonomous-analyst
 
 # Virtual environment
 python -m venv .venv
