@@ -1,0 +1,11 @@
+date,region,product,revenue,units_sold,discount_pct
+2025-01-01,North,Widget A,1500.00,30,5
+2025-01-01,South,Widget B,2200.50,44,10
+2025-01-02,North,Widget A,1350.00,27,5
+2025-01-02,East,Widget C,3100.00,62,15
+2025-01-03,South,Widget A,1800.00,36,8
+2025-01-03,North,Widget B,2500.00,50,12
+2025-01-04,East,Widget A,1650.00,33,5
+2025-01-04,West,Widget C,2900.00,58,10
+2025-01-05,North,Widget B,2100.00,42,10
+2025-01-05,South,Widget A,1400.00,28,5

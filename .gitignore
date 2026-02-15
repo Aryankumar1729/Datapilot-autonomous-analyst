@@ -1,0 +1,35 @@
+# Environment
+.env
+.venv/
+venv/
+env/
+__pycache__/
+*.pyc
+*.pyo
+
+# Data uploads (user data)
+uploads/
+*.csv
+!test_sales.csv
+
+# IDE
+.vscode/
+.idea/
+*.sublime-*
+
+# OS
+.DS_Store
+Thumbs.db
+*.swp
+
+# Testing/temp
+testing/
+sales-dashboard/
+*.log
+.coverage
+htmlcov/
+
+# Build artifacts
+dist/
+build/
+*.egg-info/
