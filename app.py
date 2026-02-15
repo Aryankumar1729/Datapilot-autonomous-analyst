@@ -342,10 +342,10 @@ def render_sidebar():
             </div>
             """, unsafe_allow_html=True)
         
-        # LLM Status indicator
+        # LLM Status indicator with test
         st.markdown("---")
         try:
-            from config.llm_config import get_llm_status
+            from config.llm_config import get_llm_status, get_llm
             status = get_llm_status()
             if status["groq_available"]:
                 llm_label = "🟢 Groq (Cloud)"
@@ -354,8 +354,20 @@ def render_sidebar():
             else:
                 llm_label = "⚪ Stats Only"
             st.markdown(f'<div style="color: #64748b; font-size: 0.75rem; text-align: center;">LLM: {llm_label}</div>', unsafe_allow_html=True)
-        except Exception:
-            pass
+            
+            # Debug test button
+            if st.button("🧪 Test LLM", key="test_llm"):
+                llm = get_llm()
+                if llm:
+                    try:
+                        result = llm.generate("Say 'Hello from DataPilot!' in one sentence.")
+                        st.success(f"✅ {result[:100]}")
+                    except Exception as e:
+                        st.error(f"❌ {str(e)[:200]}")
+                else:
+                    st.warning("No LLM available")
+        except Exception as e:
+            st.error(f"LLM init error: {str(e)[:100]}")
         
         # Footer
         st.markdown("---")

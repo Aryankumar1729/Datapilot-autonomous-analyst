@@ -576,9 +576,10 @@ def synthesize_insights_node(state: dict) -> dict:
         schema, quality, kpis, num_summary, cat_summary, goal
     )
     
-    # Build UI payload
+    # Build UI payload (pass warnings directly to include any new ones)
     _emit_progress(state, node_name, 0.92, "Preparing report...")
     ui_payload = _build_ui_payload(state, insights, executive_summary)
+    ui_payload["warnings"] = warnings  # Override with local warnings list
     
     _emit_progress(state, node_name, 0.95, "Insights ready", "complete")
     
@@ -1113,6 +1114,7 @@ def synthesize_standard_insights_node(state: dict) -> dict:
     # Build UI payload
     _emit_progress(state, node_name, 0.94, "Preparing report...")
     ui_payload = _build_standard_ui_payload(state, insights, executive_summary)
+    ui_payload["warnings"] = warnings  # Override with local warnings list
     
     _emit_progress(state, node_name, 0.95, "Insights ready", "complete")
     
