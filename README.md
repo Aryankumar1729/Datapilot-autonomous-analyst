@@ -45,9 +45,16 @@ No two datasets get the same cookie-cutter analysis.
 <details>
 <summary>Click to expand</summary>
 
-| Upload | Analysis | Dashboard |
-|--------|----------|-----------|
-| ![Upload](docs/upload.png) | ![Analysis](docs/analysis.png) | ![Dashboard](docs/dashboard.png) |
+### Homepage
+![Homepage](Homepage.png)
+
+### Upload
+![Upload](Upload.png)
+
+### Analysis
+![Analysis 1](Analysis1.png)
+![Analysis 2](Analysis2.png)
+![Analysis 3](Analysis3.png)
 
 </details>
 
